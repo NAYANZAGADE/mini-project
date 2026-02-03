@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager - Microservices Demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-tasks text-blue-600"></i>
+                Task Manager
+            </h1>
+            <p class="text-gray-600">Microservices Architecture Demo</p>
+        </div>
+
+        <!-- Add Task Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                <i class="fas fa-plus-circle text-green-600"></i>
+                Add New Task
+            </h2>
+            <div class="flex gap-4">
+                <input 
+                    type="text" 
+                    id="taskInput" 
+                    placeholder="Enter task title..."
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                <button 
+                    onclick="addTask()"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+                >
+                    <i class="fas fa-plus"></i> Add Task
+                </button>
+            </div>
+        </div>
+
+        <!-- Tasks List -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                <i class="fas fa-list text-purple-600"></i>
+                Tasks
+            </h2>
+            <div id="tasksList" class="space-y-3">
+                <!-- Tasks will be loaded here -->
+            </div>
+            <div id="emptyState" class="text-center py-8 text-gray-500 hidden">
+                <i class="fas fa-clipboard-list text-4xl mb-4"></i>
+                <p>No tasks yet. Add one above!</p>
+            </div>
+        </div>
+
+        <!-- Status Indicator -->
+        <div class="fixed bottom-4 right-4">
+            <div id="statusIndicator" class="bg-green-500 text-white px-4 py-2 rounded-full shadow-lg">
+                <i class="fas fa-circle text-xs"></i>
+                <span class="ml-2">Connected</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tasks = [];
+
+        // Load tasks on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+        });
+
+        // Add task on Enter key
+        document.getElementById('taskInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/proxy/tasks');
+                const data = await response.json();
+                tasks = data.tasks || [];
+                renderTasks();
+                updateStatus('connected');
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                updateStatus('error');
+            }
+        }
+
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            const title = input.value.trim();
+            
+            if (!title) return;
+
+            try {
+                const response = await fetch('/api/proxy/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title: title })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    loadTasks();
+                    updateStatus('connected');
+                } else {
+                    throw new Error('Failed to add task');
+                }
+            } catch (error) {
+                console.error('Error adding task:', error);
+                updateStatus('error');
+            }
+        }
+
+        async function toggleTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            try {
+                const response = await fetch(`/api/proxy/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ completed: !task.completed })
+                });
+
+                if (response.ok) {
+                    loadTasks();
+                    updateStatus('connected');
+                } else {
+                    throw new Error('Failed to update task');
+                }
+            } catch (error) {
+                console.error('Error updating task:', error);
+                updateStatus('error');
+            }
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm('Are you sure you want to delete this task?')) return;
+
+            try {
+                const response = await fetch(`/api/proxy/tasks/${taskId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadTasks();
+                    updateStatus('connected');
+                } else {
+                    throw new Error('Failed to delete task');
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                updateStatus('error');
+            }
+        }
+
+        function renderTasks() {
+            const tasksList = document.getElementById('tasksList');
+            const emptyState = document.getElementById('emptyState');
+
+            if (tasks.length === 0) {
+                tasksList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            tasksList.innerHTML = tasks.map(task => `
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition duration-200">
+                    <div class="flex items-center space-x-3">
+                        <button 
+                            onclick="toggleTask(${task.id})"
+                            class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition duration-200 ${
+                                task.completed 
+                                    ? 'bg-green-500 border-green-500 text-white' 
+                                    : 'border-gray-300 hover:border-green-500'
+                            }"
+                        >
+                            ${task.completed ? '<i class="fas fa-check text-xs"></i>' : ''}
+                        </button>
+                        <div>
+                            <span class="text-lg ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'}">${task.title}</span>
+                            <div class="text-sm text-gray-500">Created: ${task.created_at}</div>
+                        </div>
+                    </div>
+                    <button 
+                        onclick="deleteTask(${task.id})"
+                        class="text-red-500 hover:text-red-700 transition duration-200"
+                    >
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function updateStatus(status) {
+            const indicator = document.getElementById('statusIndicator');
+            
+            if (status === 'connected') {
+                indicator.className = 'bg-green-500 text-white px-4 py-2 rounded-full shadow-lg';
+                indicator.innerHTML = '<i class="fas fa-circle text-xs"></i><span class="ml-2">Connected</span>';
+            } else if (status === 'error') {
+                indicator.className = 'bg-red-500 text-white px-4 py-2 rounded-full shadow-lg';
+                indicator.innerHTML = '<i class="fas fa-exclamation-circle text-xs"></i><span class="ml-2">Connection Error</span>';
+            }
+        }
+    </script>
+</body>
+</html>
