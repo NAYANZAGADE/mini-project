@@ -29,3 +29,19 @@ EXPOSE 3000
 
 # Run the application
 CMD ["python", "app.py"]
+
+# Single-stage Dockerfile (alternative)
+# FROM python:3.11-slim
+# 
+# WORKDIR /app
+# 
+# COPY requirements.txt .
+# RUN pip install -r requirements.txt
+# 
+# COPY . .
+# 
+# ENV BACKEND_URL=http://backend:5001
+# 
+# EXPOSE 3000
+# 
+# CMD ["python", "app.py"]
