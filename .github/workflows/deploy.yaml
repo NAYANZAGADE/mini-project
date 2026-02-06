@@ -83,7 +83,5 @@ jobs:
           docker run -itd --name frontend-1 --network app-network -p 3000:3000 ${{ secrets.DOCKERHUB_USERNAME }}/frontend-ve3:latest
           docker run -itd --name backend --network app-network -p 5001:5001 ${{ secrets.DOCKERHUB_USERNAME }}/backend-ve3:latest
 
-          # echo "=== CLEANING UNUSED IMAGES ==="
-          # docker system prune -f
 
           echo "=== DEPLOYMENT COMPLETE ==="

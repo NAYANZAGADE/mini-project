@@ -1,0 +1,42 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: "ap-south-1"
+    ECR_FRONTEND: "863105074813.dkr.ecr.ap-south-1.amazonaws.com/app/frontend"
+    ECR_BACKEND: "863105074813.dkr.ecr.ap-south-1.amazonaws.com/app/backend"
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging into Amazon ECR...
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_FRONTEND
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_BACKEND
+
+      - echo Getting commit hash...
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+
+  build:
+    commands:
+      - echo Building Frontend image...
+      - docker build -t frontend:$IMAGE_TAG ./frontend
+      - docker tag frontend:$IMAGE_TAG $ECR_FRONTEND:$IMAGE_TAG
+
+      - echo Building Backend image...
+      - docker build -t backend:$IMAGE_TAG ./backend
+      - docker tag backend:$IMAGE_TAG $ECR_BACKEND:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo Pushing images to ECR...
+      - docker push $ECR_FRONTEND:$IMAGE_TAG
+      - docker push $ECR_BACKEND:$IMAGE_TAG
+
+      - echo Updating Kubernetes deployment files...
+      - sed -i "s|IMAGE_FRONTEND|$ECR_FRONTEND:$IMAGE_TAG|" k8s/deployment-frontend.yaml
+      - sed -i "s|IMAGE_BACKEND|$ECR_BACKEND:$IMAGE_TAG|" k8s/deployment-backend.yaml
+
+artifacts:
+  files:
+    - k8s/*
